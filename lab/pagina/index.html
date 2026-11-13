@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Conectar WhatsApp — Macca Tecnologia</title>
+<style>
+  :root { --navy:#0D1B2A; --cyan:#00B4D8; --txt:#1f2937; }
+  body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:#f5f7fa; color:var(--txt); }
+  .box { max-width:520px; margin:8vh auto; background:#fff; border-radius:14px; padding:32px 24px; box-shadow:0 4px 20px rgba(0,0,0,.06); }
+  h1 { font-size:20px; color:var(--navy); margin:0 0 8px; }
+  p { line-height:1.5; font-size:15px; }
+  button { background:#1877F2; color:#fff; border:0; border-radius:8px; padding:14px 20px; font-size:16px; font-weight:600; cursor:pointer; width:100%; }
+  button:disabled { opacity:.6; cursor:default; }
+  .status { margin-top:16px; font-size:14px; white-space:pre-wrap; }
+  .brand { font-weight:800; letter-spacing:.08em; font-size:13px; color:#0E7490; margin-bottom:14px; } .brand span { color:var(--navy); }
+  label { display:block; font-size:13px; font-weight:600; margin:14px 0 6px; color:var(--navy); }
+  input { width:100%; box-sizing:border-box; padding:12px; font-size:15px; border:1px solid #d1d5db; border-radius:8px; }
+  input:focus { outline:2px solid var(--cyan); border-color:transparent; }
+  form button { margin-top:18px; background:var(--navy); }
+  .sair { text-align:center; font-size:13px; margin:18px 0 0; } a { color:#0E7490; }
+  .foot { text-align:center; font-size:12px; color:#6b7280; }
+  .ok { color:#15803D; } .err { color:#B91C1C; }
+</style>
+</head>
+<body>
+<div class="box" id="login-box">
+  <div class="brand">MACCA <span>TECNOLOGIA</span></div>
+  <h1>Acesso do cliente</h1>
+  <p>Entre com o e-mail e o código de acesso enviados pela Macca para conectar o seu WhatsApp Business.</p>
+  <form id="login-form" autocomplete="on">
+    <label for="email">E-mail</label>
+    <input id="email" type="email" required autocomplete="username" placeholder="voce@empresa.com.br">
+    <label for="codigo">Código de acesso</label>
+    <input id="codigo" type="password" required autocomplete="current-password" minlength="8">
+    <button id="login-btn" type="submit">Entrar</button>
+  </form>
+  <div id="login-status" class="status"></div>
+</div>
+
+<div class="box" id="connect-box" hidden>
+  <div class="brand">MACCA <span>TECNOLOGIA</span></div>
+  <h1>Conectar o WhatsApp Business à API oficial</h1>
+  <p id="hello"></p>
+  <p>Use o mesmo número do aplicativo WhatsApp Business. Mantenha o aplicativo <b>aberto no celular</b> até a conclusão.</p>
+  <button id="btn" onclick="launch()">Conectar com o Facebook</button>
+  <div id="status" class="status"></div>
+  <p class="sair"><a href="#" onclick="sair();return false;">Sair</a></p>
+</div>
+<p class="foot"><a href="/privacidade.html">Privacidade</a> · <a href="/termos.html">Termos</a> · <a href="/exclusao-de-dados.html">Exclusão de dados</a></p>
+
+<script>
+  // ====== PREENCHER ======
+  const APP_ID     = "SEU_APP_ID";
+  const CONFIG_ID  = "SEU_CONFIG_ID";          // Login do Facebook para Empresas > Configurações (WhatsApp Embedded Signup)
+  const GRAPH_VER  = "v25.0";                   // usar a versão exibida no painel do app
+  const N8N_URL    = "https://SEU-N8N/webhook/coexistencia-onboard"; // recebe code + ids + session (POST JSON)
+  const LOGIN_URL  = "https://SEU-N8N/webhook/conectar-login";       // valida e-mail + código e devolve a sessão (30 min)
+  // =======================
+
+  const session = {};       // waba_id, phone_number_id, business_id, event
+
+  // ---------- login ----------
+  const $ = (id) => document.getElementById(id);
+  const getSess = () => { try { return sessionStorage.getItem("macca_sess") || ""; } catch (_) { return window.__sess || ""; } };
+  const setSess = (v) => { window.__sess = v; try { v ? sessionStorage.setItem("macca_sess", v) : sessionStorage.removeItem("macca_sess"); } catch (_) {} };
+  function sessValida() {
+    try { const p = JSON.parse(atob(getSess().split(".")[0].replace(/-/g, "+").replace(/_/g, "/"))); return p.x > Date.now() ? p : null; } catch (_) { return null; }
+  }
+  function mostrar() {
+    const p = sessValida();
+    $("login-box").hidden = !!p; $("connect-box").hidden = !p;
+    if (p) $("hello").textContent = "Acesso: " + p.e;
+  }
+  function sair() { setSess(""); mostrar(); }
+  document.addEventListener("DOMContentLoaded", () => {
+    mostrar();
+    $("login-form").addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const st = $("login-status"); st.className = "status"; st.textContent = "Verificando…"; $("login-btn").disabled = true;
+      try {
+        const r = await fetch(LOGIN_URL, { method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: $("email").value, codigo: $("codigo").value }) });
+        const d = await r.json().catch(() => ({}));
+        if (r.ok && d.ok && d.session) { setSess(d.session); $("codigo").value = ""; st.textContent = ""; mostrar(); }
+        else { st.className = "status err"; st.textContent = "E-mail ou código inválido."; }
+      } catch (e) { st.className = "status err"; st.textContent = "Não foi possível verificar agora. Tente de novo."; }
+      $("login-btn").disabled = false;
+    });
+  });
+  const statusEl = document.getElementById("status");
+  const log = (m, cls) => { statusEl.className = cls || ""; statusEl.textContent = m; };
+
+  window.fbAsyncInit = function () {
+    FB.init({ appId: APP_ID, autoLogAppEvents: true, xfbml: true, version: GRAPH_VER });
+  };
+
+  // Dados da sessão do Embedded Signup (ids e evento) chegam por postMessage
+  window.addEventListener("message", (event) => {
+    if (!event.origin.endsWith("facebook.com")) return;
+    try {
+      const data = JSON.parse(event.data);
+      if (data.type === "WA_EMBEDDED_SIGNUP") {
+        Object.assign(session, data.data || {}, { event: data.event });
+        console.log("session", data);
+        if (data.event === "CANCEL") log("Fluxo cancelado na etapa: " + (data.data && data.data.current_step), "err");
+        if (data.event === "ERROR")  log("Erro no fluxo: " + JSON.stringify(data.data), "err");
+      }
+    } catch (_) { /* mensagens não-JSON do SDK */ }
+  });
+
+  async function sendToBackend(code) {
+    log("Conectado. Finalizando configuração…");
+    try {
+      const r = await fetch(N8N_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, session: getSess(), ...session })
+      });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      log("Pronto! Número conectado. Mantenha o WhatsApp Business aberto por alguns minutos enquanto sincronizamos.", "ok");
+    } catch (e) {
+      log("Conexão feita, mas falhou ao avisar o servidor (" + e.message + "). Envie um print para o suporte.", "err");
+    }
+  }
+
+  function launch() {
+    if (!sessValida()) { sair(); return; }   // sessão expirou: volta para o login
+    document.getElementById("btn").disabled = true;
+    log("Abrindo o Facebook…");
+    FB.login(function (response) {
+      document.getElementById("btn").disabled = false;
+      if (response.authResponse && response.authResponse.code) {
+        sendToBackend(response.authResponse.code);   // code expira em ~30 s: o n8n troca por token na hora
+      } else {
+        log("Login não concluído.", "err");
+      }
+    }, {
+      config_id: CONFIG_ID,
+      response_type: "code",
+      override_default_response_type: true,
+      extras: {
+        setup: {},
+        featureType: "whatsapp_business_app_onboarding",   // coexistência
+        sessionInfoVersion: "3"
+      }
+    });
+  }
+</script>
+<script async defer crossorigin="anonymous" src="https://connect.facebook.net/pt_BR/sdk.js"></script>
+</body>
+</html>

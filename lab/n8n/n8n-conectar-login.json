@@ -1,0 +1,133 @@
+{
+  "name": "[Macca] Conectar — Login",
+  "nodes": [
+    {
+      "name": "Webhook login",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "conectar-login",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "https://conectar.SEU-DOMINIO"
+        }
+      }
+    },
+    {
+      "name": "Preparar consulta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst b = $input.first().json.body || {};\nconst email = String(b.email || '').trim().toLowerCase();\nconst codigo = String(b.codigo || '').trim();\nconst valido = /^[^\\s@']+@[^\\s@']+\\.[^\\s@']+$/.test(email) && codigo.length >= 8 && codigo.length <= 80;\nconst hash = crypto.createHash('sha256').update(codigo).digest('hex');\nconst q = (v) => `'${String(v).replace(/'/g, \"''\")}'`;\nconst sql = valido\n  ? `UPDATE acessos SET ultimo_login = now() WHERE email = ${q(email)} AND codigo_sha256 = ${q(hash)} AND ativo RETURNING email, cliente`\n  : `SELECT NULL::text AS email WHERE false`;\nreturn [{ json: { sql } }];"
+      }
+    },
+    {
+      "name": "Conferir acesso",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $json.sql }}",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "<CRED_ID>",
+          "name": "Postgres wa_onboard"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "name": "Emitir sessão",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst SECRET = '<HMAC_SECRET_64_HEX>';\nconst row = $input.first().json || {};\nif (!row.email) return [{ json: { ok: false, status: 401 } }];\nconst payload = Buffer.from(JSON.stringify({ e: row.email, x: Date.now() + 30 * 60 * 1000 })).toString('base64url');\nconst sig = crypto.createHmac('sha256', SECRET).update(payload).digest('base64url');\nreturn [{ json: { ok: true, status: 200, session: `${payload}.${sig}`, cliente: row.cliente || '' } }];"
+      }
+    },
+    {
+      "name": "Responder",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        880,
+        0
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.ok ? { ok: true, session: $json.session, cliente: $json.cliente } : { ok: false }) }}",
+        "options": {
+          "responseCode": "={{ $json.status }}"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook login": {
+      "main": [
+        [
+          {
+            "node": "Preparar consulta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar consulta": {
+      "main": [
+        [
+          {
+            "node": "Conferir acesso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conferir acesso": {
+      "main": [
+        [
+          {
+            "node": "Emitir sessão",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Emitir sessão": {
+      "main": [
+        [
+          {
+            "node": "Responder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none"
+  }
+}

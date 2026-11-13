@@ -1,0 +1,8 @@
+{"info":{"name":"Macca - App Review WhatsApp (Tech Provider)","schema":"https://schema.getpostman.com/json/collection/v2.1.0/collection.json","description":"Coleção para gravar o vídeo do App Review. Preencha as variáveis da coleção (token, phone_number_id, waba_id, to). O token fica só no Postman."},
+ "variable":[{"key":"graph","value":"https://graph.facebook.com/v25.0"},{"key":"token","value":""},{"key":"phone_number_id","value":""},{"key":"waba_id","value":""},{"key":"to","value":""}],
+ "auth":{"type":"bearer","bearer":[{"key":"token","value":"{{token}}","type":"string"}]},
+ "item":[
+  {"name":"1. Enviar mensagem (whatsapp_business_messaging)","request":{"method":"POST","header":[{"key":"Content-Type","value":"application/json"}],"url":"{{graph}}/{{phone_number_id}}/messages","body":{"mode":"raw","raw":"{\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"{{to}}\",\n  \"type\": \"template\",\n  \"template\": { \"name\": \"hello_world\", \"language\": { \"code\": \"en_US\" } }\n}"}}},
+  {"name":"2. Listar modelos (whatsapp_business_management)","request":{"method":"GET","url":"{{graph}}/{{waba_id}}/message_templates?fields=name,status,category,language"}},
+  {"name":"3. Criar modelo (whatsapp_business_management)","request":{"method":"POST","header":[{"key":"Content-Type","value":"application/json"}],"url":"{{graph}}/{{waba_id}}/message_templates","body":{"mode":"raw","raw":"{\n  \"name\": \"macca_app_review_demo\",\n  \"language\": \"pt_BR\",\n  \"category\": \"UTILITY\",\n  \"components\": [ { \"type\": \"BODY\", \"text\": \"Olá! Seu atendimento foi registrado e nossa equipe responde em breve.\" } ]\n}"}}}
+ ]}

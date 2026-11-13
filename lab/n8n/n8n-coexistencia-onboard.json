@@ -1,0 +1,428 @@
+{
+  "name": "[Macca] WhatsApp Coexistência — Onboard (Embedded Signup)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "coexistencia-onboard",
+        "responseMode": "onReceived",
+        "options": {
+          "allowedOrigins": "https://conectar.SEU-DOMINIO"
+        }
+      },
+      "name": "Webhook (página)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c1",
+              "name": "graph",
+              "value": "https://graph.facebook.com/v25.0",
+              "type": "string"
+            },
+            {
+              "id": "c2",
+              "name": "app_id",
+              "value": "SEU_APP_ID",
+              "type": "string"
+            },
+            {
+              "id": "c3",
+              "name": "code",
+              "value": "={{ $json.body.code }}",
+              "type": "string"
+            },
+            {
+              "id": "c4",
+              "name": "waba_id",
+              "value": "={{ $json.body.waba_id }}",
+              "type": "string"
+            },
+            {
+              "id": "c5",
+              "name": "phone_number_id",
+              "value": "={{ $json.body.phone_number_id }}",
+              "type": "string"
+            },
+            {
+              "id": "c6",
+              "name": "business_id",
+              "value": "={{ $json.body.business_id }}",
+              "type": "string"
+            },
+            {
+              "id": "c7",
+              "name": "event",
+              "value": "={{ $json.body.event }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.graph }}/oauth/access_token",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "client_id",
+              "value": "={{ $json.app_id }}"
+            },
+            {
+              "name": "code",
+              "value": "={{ $json.code }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Trocar code por token",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        0
+      ],
+      "notes": "Credencial Query Auth: name = client_secret, value = app secret do app Meta. O code expira em ~30 s.",
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "<CRED_ID>",
+          "name": "Meta App Secret - Macca Coexistence"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').item.json.graph }}/{{ $('Config').item.json.waba_id }}/subscribed_apps",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Trocar code por token').item.json.access_token }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Inscrever app na WABA",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').item.json.graph }}/{{ $('Config').item.json.phone_number_id }}/smb_app_data",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Trocar code por token').item.json.access_token }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"messaging_product\":\"whatsapp\",\"sync_type\":\"smb_app_state_sync\"}",
+        "options": {}
+      },
+      "name": "Sync contatos",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').item.json.graph }}/{{ $('Config').item.json.phone_number_id }}/smb_app_data",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Trocar code por token').item.json.access_token }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"messaging_product\":\"whatsapp\",\"sync_type\":\"history\"}",
+        "options": {}
+      },
+      "name": "Sync histórico",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Config').item.json.graph }}/{{ $('Config').item.json.phone_number_id }}",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "fields",
+              "value": "is_on_biz_app,platform_type,verified_name,status"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Trocar code por token').item.json.access_token }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Conferir status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1320,
+        0
+      ],
+      "notes": "Esperado: is_on_biz_app = true e platform_type = CLOUD_API."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "r1",
+              "name": "waba_id",
+              "value": "={{ $('Config').item.json.waba_id }}",
+              "type": "string"
+            },
+            {
+              "id": "r2",
+              "name": "phone_number_id",
+              "value": "={{ $('Config').item.json.phone_number_id }}",
+              "type": "string"
+            },
+            {
+              "id": "r3",
+              "name": "is_on_biz_app",
+              "value": "={{ $json.is_on_biz_app }}",
+              "type": "boolean"
+            },
+            {
+              "id": "r4",
+              "name": "platform_type",
+              "value": "={{ $json.platform_type }}",
+              "type": "string"
+            },
+            {
+              "id": "r5",
+              "name": "ok",
+              "value": "={{ $json.is_on_biz_app === true && $json.platform_type === 'CLOUD_API' }}",
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Resultado (sem token)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1540,
+        0
+      ],
+      "notes": "Para guardar o token: Supabase/credencial a partir de 'Trocar code por token'. Nunca em Set/log."
+    },
+    {
+      "name": "Montar SQL do token",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        -220
+      ],
+      "parameters": {
+        "jsCode": "const c = $('Config').first().json;\nconst t = $('Trocar code por token').first().json.access_token;\nif (!t) throw new Error('sem access_token na troca do code');\nconst q = (v) => v === undefined || v === null || v === '' ? 'NULL' : `'${String(v).replace(/'/g, \"''\")}'`;\nreturn [{ json: { sql: `INSERT INTO wa_conexoes (waba_id, phone_number_id, business_id, access_token, evento, login_email) VALUES (${q(c.waba_id)}, ${q(c.phone_number_id)}, ${q(c.business_id)}, ${q(t)}, ${q(c.event)}, ${q($('Validar sessão').first().json.login_email)}) RETURNING id` } }];"
+      }
+    },
+    {
+      "name": "Guardar token",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [
+        880,
+        -220
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $json.sql }}",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "<CRED_ID>",
+          "name": "Postgres wa_onboard"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "notes": "Token fica em wa_onboard.wa_conexoes (Postgres interno da VPS, sem porta pública)."
+    },
+    {
+      "name": "Validar sessão",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        -160
+      ],
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst SECRET = '<HMAC_SECRET_64_HEX>';\nconst item = $input.first().json;\nconst s = String(item.body?.session || '');\nconst [payload, sig] = s.split('.');\nif (!payload || !sig) throw new Error('sessao ausente');\nconst esperado = crypto.createHmac('sha256', SECRET).update(payload).digest('base64url');\nif (sig.length !== esperado.length || !crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(esperado))) throw new Error('sessao invalida');\nconst d = JSON.parse(Buffer.from(payload, 'base64url').toString());\nif (!d.x || Date.now() > d.x) throw new Error('sessao expirada');\nreturn [{ json: { ...item, login_email: d.e } }];"
+      }
+    }
+  ],
+  "connections": {
+    "Webhook (página)": {
+      "main": [
+        [
+          {
+            "node": "Validar sessão",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Trocar code por token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trocar code por token": {
+      "main": [
+        [
+          {
+            "node": "Montar SQL do token",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Inscrever app na WABA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Inscrever app na WABA": {
+      "main": [
+        [
+          {
+            "node": "Sync contatos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sync contatos": {
+      "main": [
+        [
+          {
+            "node": "Sync histórico",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sync histórico": {
+      "main": [
+        [
+          {
+            "node": "Conferir status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conferir status": {
+      "main": [
+        [
+          {
+            "node": "Resultado (sem token)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar SQL do token": {
+      "main": [
+        [
+          {
+            "node": "Guardar token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar sessão": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "all",
+    "saveDataErrorExecution": "all"
+  }
+}

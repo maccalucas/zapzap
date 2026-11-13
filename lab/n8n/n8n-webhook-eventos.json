@@ -1,0 +1,156 @@
+{
+  "name": "[Macca] WhatsApp Coexistence - Webhook",
+  "nodes": [
+    {
+      "name": "Verify (GET)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "whatsapp-coexistence-macca",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "name": "Token confere?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "b8d839e5-20c3-4563-8ef5-e997d34080af",
+              "leftValue": "={{ $json.query['hub.verify_token'] }}",
+              "rightValue": "<VERIFY_TOKEN>",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "name": "Responde challenge",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        440,
+        -100
+      ],
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.query['hub.challenge'] }}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "name": "Recusa (403)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        440,
+        100
+      ],
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "forbidden",
+        "options": {
+          "responseCode": 403
+        }
+      }
+    },
+    {
+      "name": "Eventos (POST)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        320
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp-coexistence-macca",
+        "responseMode": "onReceived",
+        "options": {}
+      }
+    },
+    {
+      "name": "Processar (a implementar)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        220,
+        320
+      ],
+      "parameters": {},
+      "notes": "O 200 ja foi devolvido a Meta pelo webhook (onReceived). Ligue o processamento a partir daqui.",
+      "notesInFlow": true
+    }
+  ],
+  "connections": {
+    "Verify (GET)": {
+      "main": [
+        [
+          {
+            "node": "Token confere?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Token confere?": {
+      "main": [
+        [
+          {
+            "node": "Responde challenge",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Recusa (403)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Eventos (POST)": {
+      "main": [
+        [
+          {
+            "node": "Processar (a implementar)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
